@@ -240,55 +240,15 @@ void monitoringServerCryptoNegativeTest()
 
 void messageSerializationTest()
 {
-    MessageSerializer serializer;
     std::vector<std::shared_ptr<Message>> messages;
 
-    auto callback = [&](const Message& msg) {
-        do
-        {
-            const MessageCommand* messageCommand = dynamic_cast<const MessageCommand*>(&msg);
-            if (messageCommand)
-            {
-                messages.push_back(std::shared_ptr<Message>(new MessageCommand(*messageCommand)));
-                break;
-            }
-            const MessageError* messageError = dynamic_cast<const MessageError*>(&msg);
-            if (messageError)
-            {
-                messages.push_back(std::shared_ptr<Message>(new MessageError(*messageError)));
-                break;
-            }
-            const MessageMeterage* messageMeterage = dynamic_cast<const MessageMeterage*>(&msg);
-            if (messageMeterage)
-            {
-                messages.push_back(std::shared_ptr<Message>(new MessageMeterage(*messageMeterage)));
-                break;
-            }
-        } while (false);
-    };
-
-    ASSERT_EQUAL(serializer.deserialize("", callback), false);
-    ASSERT_EQUAL(serializer.deserialize("12345", callback), false);
-    ASSERT_EQUAL(serializer.deserialize("e", callback), false);
-    ASSERT_EQUAL(serializer.deserialize("eA", callback), false);
-    ASSERT_EQUAL(serializer.deserialize("m", callback), false);
-    ASSERT_EQUAL(serializer.deserialize("mA", callback), false);
-    ASSERT_EQUAL(serializer.deserialize("c", callback), false);
-
-    ASSERT_EQUAL(serializer.deserialize(serializer.serialize(MessageCommand(0)), callback), true);
-    ASSERT_EQUAL(serializer.deserialize(serializer.serialize(MessageCommand(1)), callback), true);
-    ASSERT_EQUAL(serializer.deserialize(serializer.serialize(MessageCommand(-1)), callback), true);
-    ASSERT_EQUAL(serializer.deserialize(serializer.serialize(MessageCommand(123)), callback), true);
-    ASSERT_EQUAL(serializer.deserialize(serializer.serialize(MessageCommand(std::numeric_limits<int8_t>::max())), callback), true);
-    ASSERT_EQUAL(serializer.deserialize(serializer.serialize(MessageCommand(std::numeric_limits<int8_t>::min())), callback), true);
-    ASSERT_EQUAL(serializer.deserialize(serializer.serialize(MessageMeterage(12345u, 123u)), callback), true);
-    ASSERT_EQUAL(serializer.deserialize(serializer.serialize(MessageMeterage(std::numeric_limits<uint64_t>::min(), std::numeric_limits<uint8_t>::min())), callback), true);
-    ASSERT_EQUAL(serializer.deserialize(serializer.serialize(MessageMeterage(std::numeric_limits<uint64_t>::max(), std::numeric_limits<uint8_t>::min())), callback), true);
-    ASSERT_EQUAL(serializer.deserialize(serializer.serialize(MessageMeterage(std::numeric_limits<uint64_t>::max(), std::numeric_limits<uint8_t>::max())), callback), true);
-    ASSERT_EQUAL(serializer.deserialize(serializer.serialize(MessageMeterage(std::numeric_limits<uint64_t>::min(), std::numeric_limits<uint8_t>::max())), callback), true);
-    ASSERT_EQUAL(serializer.deserialize(serializer.serialize(MessageError(MessageError::ErrorType::NoSchedule)), callback), true);
-    ASSERT_EQUAL(serializer.deserialize(serializer.serialize(MessageError(MessageError::ErrorType::NoTimestamp)), callback), true);
-    ASSERT_EQUAL(serializer.deserialize(serializer.serialize(MessageError(MessageError::ErrorType::Obsolete)), callback), true);
+    ASSERT_EQUAL(MessageSerializer::deserialize("").get(), nullptr);
+    ASSERT_EQUAL(MessageSerializer::deserialize("12345").get(), nullptr);
+    ASSERT_EQUAL(MessageSerializer::deserialize("e").get(), nullptr);
+    ASSERT_EQUAL(MessageSerializer::deserialize("eA").get(), nullptr);
+    ASSERT_EQUAL(MessageSerializer::deserialize("m").get(), nullptr);
+    ASSERT_EQUAL(MessageSerializer::deserialize("mA").get(), nullptr);
+    ASSERT_EQUAL(MessageSerializer::deserialize("c").get(), nullptr);
 
     std::vector<std::shared_ptr<Message>> expected = {
         std::shared_ptr<Message>(new MessageCommand(0)),
@@ -306,6 +266,12 @@ void messageSerializationTest()
         std::shared_ptr<Message>(new MessageError(MessageError::ErrorType::NoTimestamp)),
         std::shared_ptr<Message>(new MessageError(MessageError::ErrorType::Obsolete)),
     };
+
+    for (auto& ptr : expected)
+    {
+        messages.push_back(std::move(MessageSerializer::deserialize(MessageSerializer::serialize(*ptr))));
+    }
+
     COMPARE_VECTORS_OF_SMART_PTRS(expected, messages);
 }
 
@@ -358,9 +324,9 @@ void messageEncoderAddTest()
     public:
         TestEncoderExecutor(const std::string& message) :
             test_message(message) {}
-        std::string encode(const std::string&) const override { return test_message; }
-        std::string decode(const std::string&) const override { return test_message; }
-        std::string name() const override { return "Test"; }
+        std::string encode(const std::string&) const override final { return test_message; }
+        std::string decode(const std::string&) const override final { return test_message; }
+        std::string name() const override final { return "Test"; }
 
     private:
         std::string test_message;
@@ -380,9 +346,9 @@ void messageEncoderDoubleAddTest()
     public:
         TestEncoderExecutor(const std::string& message) :
             test_message(message) {}
-        std::string encode(const std::string&) const override { return test_message; }
-        std::string decode(const std::string&) const override { return test_message; }
-        std::string name() const override { return "Test"; }
+        std::string encode(const std::string&) const override final { return test_message; }
+        std::string decode(const std::string&) const override final { return test_message; }
+        std::string name() const override final { return "Test"; }
 
     private:
         std::string test_message;
@@ -536,116 +502,87 @@ void messageEncoderMultiply41Test()
     ASSERT_EQUAL(message, decoded);
 }
 
-struct CommandCenterCallback
-{
-    CommandCenterCallback(uint64_t deviceId) :
-        deviceId(deviceId) {}
-
-    void operator()(uint64_t id, const Message& msg)
-    {
-        ASSERT_EQUAL(id, deviceId);
-        do
-        {
-            const MessageCommand* messageCommand = dynamic_cast<const MessageCommand*>(&msg);
-            if (messageCommand)
-            {
-                messages.push_back(std::shared_ptr<Message>(new MessageCommand(*messageCommand)));
-                break;
-            }
-            const MessageError* messageError = dynamic_cast<const MessageError*>(&msg);
-            if (messageError)
-            {
-                messages.push_back(std::shared_ptr<Message>(new MessageError(*messageError)));
-                break;
-            }
-            ASSERT(false);
-        } while (false);
-    }
-    uint64_t deviceId;
-    std::vector<std::shared_ptr<Message>> messages;
-};
-
 void commandCenterNoScheduleTest()
 {
     CommandCenter center;
     uint64_t deviceId = 123u;
-    CommandCenterCallback callback(deviceId);
+    std::vector<std::shared_ptr<Message>> messages;
     MessageMeterage meterage = MessageMeterage(0u, 0u);
-    center.processMeterage(deviceId, meterage, std::ref(callback));
+    messages.push_back(std::move(center.processMeterage(deviceId, meterage)));
     std::vector<std::shared_ptr<Message>> expected = {
         std::shared_ptr<Message>(new MessageError(MessageError::ErrorType::NoSchedule)),
     };
-    COMPARE_VECTORS_OF_SMART_PTRS(expected, callback.messages);
+    COMPARE_VECTORS_OF_SMART_PTRS(expected, messages);
 }
 
 void commandCenterNoTimestampTest()
 {
     CommandCenter center;
     uint64_t deviceId = 123u;
-    CommandCenterCallback callback(deviceId);
+    std::vector<std::shared_ptr<Message>> messages;
     MessageMeterage meterage = MessageMeterage(0u, 0u);
     center.setSchedule({ deviceId, { { 1u, 0u } } });
-    center.processMeterage(deviceId, meterage, std::ref(callback));
+    messages.push_back(std::move(center.processMeterage(deviceId, meterage)));
     std::vector<std::shared_ptr<Message>> expected = {
         std::shared_ptr<Message>(new MessageError(MessageError::ErrorType::NoTimestamp)),
     };
-    COMPARE_VECTORS_OF_SMART_PTRS(expected, callback.messages);
+    COMPARE_VECTORS_OF_SMART_PTRS(expected, messages);
 }
 
 void commandCenterCommandZeroTest()
 {
     CommandCenter center;
     uint64_t deviceId = 123u;
-    CommandCenterCallback callback(deviceId);
+    std::vector<std::shared_ptr<Message>> messages;
     MessageMeterage meterage = MessageMeterage(0u, 0u);
     center.setSchedule({ deviceId, { { 0u, 0u } } });
-    center.processMeterage(deviceId, meterage, std::ref(callback));
+    messages.push_back(std::move(center.processMeterage(deviceId, meterage)));
     std::vector<std::shared_ptr<Message>> expected = {
         std::shared_ptr<Message>(new MessageCommand(0)),
     };
-    COMPARE_VECTORS_OF_SMART_PTRS(expected, callback.messages);
+    COMPARE_VECTORS_OF_SMART_PTRS(expected, messages);
 }
 
 void commandCenterCommandUpTest()
 {
     CommandCenter center;
     uint64_t deviceId = 123u;
-    CommandCenterCallback callback(deviceId);
+    std::vector<std::shared_ptr<Message>> messages;
     MessageMeterage meterage = MessageMeterage(0u, 49u);
     center.setSchedule({ deviceId, { { 0u, 100u } } });
-    center.processMeterage(deviceId, meterage, std::ref(callback));
+    messages.push_back(std::move(center.processMeterage(deviceId, meterage)));
     std::vector<std::shared_ptr<Message>> expected = {
         std::shared_ptr<Message>(new MessageCommand(51)),
     };
-    COMPARE_VECTORS_OF_SMART_PTRS(expected, callback.messages);
+    COMPARE_VECTORS_OF_SMART_PTRS(expected, messages);
 }
 
 void commandCenterCommandDownTest()
 {
     CommandCenter center;
     uint64_t deviceId = 123u;
-    CommandCenterCallback callback(deviceId);
+    std::vector<std::shared_ptr<Message>> messages;
     MessageMeterage meterage = MessageMeterage(0u, 100u);
     center.setSchedule({ deviceId, { { 0u, 49u } } });
-    center.processMeterage(deviceId, meterage, std::ref(callback));
+    messages.push_back(std::move(center.processMeterage(deviceId, meterage)));
     std::vector<std::shared_ptr<Message>> expected = {
         std::shared_ptr<Message>(new MessageCommand(-51)),
     };
-    COMPARE_VECTORS_OF_SMART_PTRS(expected, callback.messages);
+    COMPARE_VECTORS_OF_SMART_PTRS(expected, messages);
 }
 
 void commandCenterObsoleteTest()
 {
     CommandCenter center;
     uint64_t deviceId = 123u;
-    CommandCenterCallback callback(deviceId);
-    center.processMeterage(deviceId, MessageMeterage(0u, 100u), std::ref(callback));
-    center.processMeterage(deviceId, MessageMeterage(0u, 100u), std::ref(callback));
+    std::vector<std::shared_ptr<Message>> messages;
+    messages.push_back(std::move(center.processMeterage(deviceId, MessageMeterage(0u, 100u))));
+    messages.push_back(std::move(center.processMeterage(deviceId, MessageMeterage(0u, 100u))));
     center.setSchedule({ deviceId, { { 2u, 50u } } });
-    center.processMeterage(deviceId, MessageMeterage(1u, 100u), std::ref(callback));
-    center.processMeterage(deviceId, MessageMeterage(1u, 100u), std::ref(callback));
-    center.processMeterage(deviceId, MessageMeterage(2u, 100u), std::ref(callback));
-    center.processMeterage(deviceId, MessageMeterage(2u, 100u), std::ref(callback));
+    messages.push_back(std::move(center.processMeterage(deviceId, MessageMeterage(1u, 100u))));
+    messages.push_back(std::move(center.processMeterage(deviceId, MessageMeterage(1u, 100u))));
+    messages.push_back(std::move(center.processMeterage(deviceId, MessageMeterage(2u, 100u))));
+    messages.push_back(std::move(center.processMeterage(deviceId, MessageMeterage(2u, 100u))));
     std::vector<std::shared_ptr<Message>> expected = {
         std::shared_ptr<Message>(new MessageError(MessageError::ErrorType::NoSchedule)),
         std::shared_ptr<Message>(new MessageError(MessageError::ErrorType::Obsolete)),
@@ -654,7 +591,7 @@ void commandCenterObsoleteTest()
         std::shared_ptr<Message>(new MessageCommand(-50)),
         std::shared_ptr<Message>(new MessageError(MessageError::ErrorType::Obsolete)),
     };
-    COMPARE_VECTORS_OF_SMART_PTRS(expected, callback.messages);
+    COMPARE_VECTORS_OF_SMART_PTRS(expected, messages);
 }
 
 void commandCenterTwoDevicesTest()
@@ -662,36 +599,36 @@ void commandCenterTwoDevicesTest()
     CommandCenter center;
     MessageMeterage meterage = MessageMeterage(0u, 100u);
     uint64_t deviceId1 = 111u, deviceId2 = 222u;
-    CommandCenterCallback callback1(deviceId1), callback2(deviceId2);
+    std::vector<std::shared_ptr<Message>> messages1, messages2;
     center.setSchedule({ deviceId1, { { 0u, 10u } } });
     center.setSchedule({ deviceId2, { { 0u, 50u } } });
-    center.processMeterage(deviceId1, meterage, std::ref(callback1));
-    center.processMeterage(deviceId1, meterage, std::ref(callback1));
-    center.processMeterage(deviceId2, meterage, std::ref(callback2));
+    messages1.push_back(std::move(center.processMeterage(deviceId1, meterage)));
+    messages1.push_back(std::move(center.processMeterage(deviceId1, meterage)));
+    messages2.push_back(std::move(center.processMeterage(deviceId2, meterage)));
 
     std::vector<std::shared_ptr<Message>> expected1 = {
         std::shared_ptr<Message>(new MessageCommand(-90)),
         std::shared_ptr<Message>(new MessageError(MessageError::ErrorType::Obsolete)),
     };
-    COMPARE_VECTORS_OF_SMART_PTRS(expected1, callback1.messages);
+    COMPARE_VECTORS_OF_SMART_PTRS(expected1, messages1);
 
     std::vector<std::shared_ptr<Message>> expected2 = {
         std::shared_ptr<Message>(new MessageCommand(-50)),
     };
-    COMPARE_VECTORS_OF_SMART_PTRS(expected2, callback2.messages);
+    COMPARE_VECTORS_OF_SMART_PTRS(expected2, messages2);
 }
 
 void commandCenterUnsortedScheduleTest()
 {
     CommandCenter center;
     uint64_t deviceId = 123u;
-    CommandCenterCallback callback(deviceId);
+    std::vector<std::shared_ptr<Message>> messages;
     center.setSchedule({ deviceId, { { 3u, 30u }, { 0u, 0u }, { 2u, 20u }, { 1u, 10u } } });
-    center.processMeterage(deviceId, MessageMeterage(0u, 100u), std::ref(callback));
-    center.processMeterage(deviceId, MessageMeterage(1u, 100u), std::ref(callback));
-    center.processMeterage(deviceId, MessageMeterage(2u, 100u), std::ref(callback));
-    center.processMeterage(deviceId, MessageMeterage(3u, 100u), std::ref(callback));
-    center.processMeterage(deviceId, MessageMeterage(4u, 100u), std::ref(callback));
+    messages.push_back(std::move(center.processMeterage(deviceId, MessageMeterage(0u, 100u))));
+    messages.push_back(std::move(center.processMeterage(deviceId, MessageMeterage(1u, 100u))));
+    messages.push_back(std::move(center.processMeterage(deviceId, MessageMeterage(2u, 100u))));
+    messages.push_back(std::move(center.processMeterage(deviceId, MessageMeterage(3u, 100u))));
+    messages.push_back(std::move(center.processMeterage(deviceId, MessageMeterage(4u, 100u))));
     std::vector<std::shared_ptr<Message>> expected = {
         std::shared_ptr<Message>(new MessageCommand(-100)),
         std::shared_ptr<Message>(new MessageCommand(-90)),
@@ -699,45 +636,45 @@ void commandCenterUnsortedScheduleTest()
         std::shared_ptr<Message>(new MessageCommand(-70)),
         std::shared_ptr<Message>(new MessageCommand(-70)),
     };
-    COMPARE_VECTORS_OF_SMART_PTRS(expected, callback.messages);
+    COMPARE_VECTORS_OF_SMART_PTRS(expected, messages);
 }
 
 void commandCenterDublicateScheduleTest()
 {
     CommandCenter center;
     uint64_t deviceId = 123u;
-    CommandCenterCallback callback(deviceId);
+    std::vector<std::shared_ptr<Message>> messages;
     center.setSchedule({ deviceId, { { 0u, 0u }, { 0u, 0u }, { 0u, 0u }, { 1u, 10u } } });
-    center.processMeterage(deviceId, MessageMeterage(0u, 100u), std::ref(callback));
-    center.processMeterage(deviceId, MessageMeterage(1u, 100u), std::ref(callback));
-    center.processMeterage(deviceId, MessageMeterage(2u, 100u), std::ref(callback));
+    messages.push_back(std::move(center.processMeterage(deviceId, MessageMeterage(0u, 100u))));
+    messages.push_back(std::move(center.processMeterage(deviceId, MessageMeterage(1u, 100u))));
+    messages.push_back(std::move(center.processMeterage(deviceId, MessageMeterage(2u, 100u))));
     std::vector<std::shared_ptr<Message>> expected = {
         std::shared_ptr<Message>(new MessageCommand(-100)),
         std::shared_ptr<Message>(new MessageCommand(-90)),
         std::shared_ptr<Message>(new MessageCommand(-90)),
     };
-    COMPARE_VECTORS_OF_SMART_PTRS(expected, callback.messages);
+    COMPARE_VECTORS_OF_SMART_PTRS(expected, messages);
 }
 
 void commandCenterNewScheduleTest()
 {
     CommandCenter center;
     uint64_t deviceId = 123u;
-    CommandCenterCallback callback(deviceId);
+    std::vector<std::shared_ptr<Message>> messages;
     center.setSchedule({ deviceId, { { 0u, 100u }, { 1u, 50u } } });
-    center.processMeterage(deviceId, MessageMeterage(0u, 99u), std::ref(callback));
-    center.processMeterage(deviceId, MessageMeterage(1u, 100u), std::ref(callback));
-    center.processMeterage(deviceId, MessageMeterage(2u, 50u), std::ref(callback));
+    messages.push_back(std::move(center.processMeterage(deviceId, MessageMeterage(0u, 99u))));
+    messages.push_back(std::move(center.processMeterage(deviceId, MessageMeterage(1u, 100u))));
+    messages.push_back(std::move(center.processMeterage(deviceId, MessageMeterage(2u, 50u))));
     center.setSchedule({ deviceId, { { 3u, 0u } } });
-    center.processMeterage(deviceId, MessageMeterage(3u, 50u), std::ref(callback));
+    messages.push_back(std::move(center.processMeterage(deviceId, MessageMeterage(3u, 50u))));
     center.setSchedule({ deviceId, { { 0u, 100u }, { 1u, 50u }, { 3u, 0u }, { 4u, 10u } } });
-    center.processMeterage(deviceId, MessageMeterage(4u, 40u), std::ref(callback));
+    messages.push_back(std::move(center.processMeterage(deviceId, MessageMeterage(4u, 40u))));
     center.setSchedule({ deviceId, { { 10u, 0u } } });
-    center.processMeterage(deviceId, MessageMeterage(5u, 50u), std::ref(callback));
-    center.processMeterage(deviceId, MessageMeterage(5u, 50u), std::ref(callback));
+    messages.push_back(std::move(center.processMeterage(deviceId, MessageMeterage(5u, 50u))));
+    messages.push_back(std::move(center.processMeterage(deviceId, MessageMeterage(5u, 50u))));
     center.setSchedule({ deviceId, {} });
-    center.processMeterage(deviceId, MessageMeterage(6u, 50u), std::ref(callback));
-    center.processMeterage(deviceId, MessageMeterage(6u, 50u), std::ref(callback));
+    messages.push_back(std::move(center.processMeterage(deviceId, MessageMeterage(6u, 50u))));
+    messages.push_back(std::move(center.processMeterage(deviceId, MessageMeterage(6u, 50u))));
     std::vector<std::shared_ptr<Message>> expected = {
         std::shared_ptr<Message>(new MessageCommand(1)),
         std::shared_ptr<Message>(new MessageCommand(-50)),
@@ -749,21 +686,21 @@ void commandCenterNewScheduleTest()
         std::shared_ptr<Message>(new MessageError(MessageError::ErrorType::NoSchedule)),
         std::shared_ptr<Message>(new MessageError(MessageError::ErrorType::Obsolete)),
     };
-    COMPARE_VECTORS_OF_SMART_PTRS(expected, callback.messages);
+    COMPARE_VECTORS_OF_SMART_PTRS(expected, messages);
 }
 
 void commandCenterDeviationTest()
 {
     CommandCenter center;
     uint64_t deviceId = 123u;
-    CommandCenterCallback callback(deviceId);
+    std::vector<std::shared_ptr<Message>> messages;
     center.setSchedule({ deviceId, { { 0u, 50u }, { 3u, 90u } } });
-    center.processMeterage(deviceId, MessageMeterage(0u, 100u), std::ref(callback));
-    center.processMeterage(deviceId, MessageMeterage(1u, 0u), std::ref(callback));
-    center.processMeterage(deviceId, MessageMeterage(2u, 100u), std::ref(callback));
-    center.processMeterage(deviceId, MessageMeterage(3u, 0u), std::ref(callback));
-    center.processMeterage(deviceId, MessageMeterage(4u, 50u), std::ref(callback));
-    center.processMeterage(deviceId, MessageMeterage(5u, 100u), std::ref(callback));
+    messages.push_back(std::move(center.processMeterage(deviceId, MessageMeterage(0u, 100u))));
+    messages.push_back(std::move(center.processMeterage(deviceId, MessageMeterage(1u, 0u))));
+    messages.push_back(std::move(center.processMeterage(deviceId, MessageMeterage(2u, 100u))));
+    messages.push_back(std::move(center.processMeterage(deviceId, MessageMeterage(3u, 0u))));
+    messages.push_back(std::move(center.processMeterage(deviceId, MessageMeterage(4u, 50u))));
+    messages.push_back(std::move(center.processMeterage(deviceId, MessageMeterage(5u, 100u))));
 
     const auto& deviations = center.deviationStats(deviceId);
     std::vector<DeviationStats> expected = { { { 0u, 50u }, 0u, 50.0 }, { { 3u, 90u }, 3u, 57.15 } };
@@ -780,20 +717,20 @@ void commandCenterDeviationNewScheduleTest()
 {
     CommandCenter center;
     uint64_t deviceId = 123u;
-    CommandCenterCallback callback(deviceId);
+    std::vector<std::shared_ptr<Message>> messages;
     center.setSchedule({ deviceId, { { 0u, 50u }, { 3u, 90u } } });
-    center.processMeterage(deviceId, MessageMeterage(0u, 100u), std::ref(callback));
-    center.processMeterage(deviceId, MessageMeterage(1u, 0u), std::ref(callback));
-    center.processMeterage(deviceId, MessageMeterage(2u, 100u), std::ref(callback));
-    center.processMeterage(deviceId, MessageMeterage(3u, 80u), std::ref(callback));
-    center.processMeterage(deviceId, MessageMeterage(4u, 100u), std::ref(callback));
-    center.processMeterage(deviceId, MessageMeterage(5u, 80u), std::ref(callback));
+    messages.push_back(std::move(center.processMeterage(deviceId, MessageMeterage(0u, 100u))));
+    messages.push_back(std::move(center.processMeterage(deviceId, MessageMeterage(1u, 0u))));
+    messages.push_back(std::move(center.processMeterage(deviceId, MessageMeterage(2u, 100u))));
+    messages.push_back(std::move(center.processMeterage(deviceId, MessageMeterage(3u, 80u))));
+    messages.push_back(std::move(center.processMeterage(deviceId, MessageMeterage(4u, 100u))));
+    messages.push_back(std::move(center.processMeterage(deviceId, MessageMeterage(5u, 80u))));
     center.setSchedule({ deviceId, { { 0u, 0u }, { 6u, 30u } } });
-    center.processMeterage(deviceId, MessageMeterage(6u, 0u), std::ref(callback));
-    center.processMeterage(deviceId, MessageMeterage(7u, 60u), std::ref(callback));
-    center.processMeterage(deviceId, MessageMeterage(8u, 0u), std::ref(callback));
+    messages.push_back(std::move(center.processMeterage(deviceId, MessageMeterage(6u, 0u))));
+    messages.push_back(std::move(center.processMeterage(deviceId, MessageMeterage(7u, 60u))));
+    messages.push_back(std::move(center.processMeterage(deviceId, MessageMeterage(8u, 0u))));
     center.setSchedule({ deviceId, { { 0u, 0u } } });
-    center.processMeterage(deviceId, MessageMeterage(9u, 50u), std::ref(callback));
+    messages.push_back(std::move(center.processMeterage(deviceId, MessageMeterage(9u, 50u))));
 
     const auto& deviations = center.deviationStats(deviceId);
     std::vector<DeviationStats> expected = {
@@ -815,17 +752,17 @@ void commandCenterForgetTest()
 {
     CommandCenter center;
     uint64_t deviceId = 123u;
-    CommandCenterCallback callback(deviceId);
+    std::vector<std::shared_ptr<Message>> messages;
     MessageMeterage meterage = MessageMeterage(0u, 0u);
     center.setSchedule({ deviceId, { { 0u, 1u } } });
-    center.processMeterage(deviceId, meterage, std::ref(callback));
-    center.processMeterage(deviceId, meterage, std::ref(callback));
+    messages.push_back(std::move(center.processMeterage(deviceId, meterage)));
+    messages.push_back(std::move(center.processMeterage(deviceId, meterage)));
 
     std::vector<std::shared_ptr<Message>> expectedMsg = {
         std::shared_ptr<Message>(new MessageCommand(1)),
         std::shared_ptr<Message>(new MessageError(MessageError::ErrorType::Obsolete)),
     };
-    COMPARE_VECTORS_OF_SMART_PTRS(expectedMsg, callback.messages);
+    COMPARE_VECTORS_OF_SMART_PTRS(expectedMsg, messages);
 
     auto deviations = center.deviationStats(deviceId);
     std::vector<DeviationStats> expectedDev = { { { 0u, 1u }, 0u, 1.0 } };
@@ -838,10 +775,10 @@ void commandCenterForgetTest()
     }
 
     center.forgetDevice(deviceId);
-    center.processMeterage(deviceId, meterage, std::ref(callback));
+    messages.push_back(std::move(center.processMeterage(deviceId, meterage)));
 
     expectedMsg.push_back(std::shared_ptr<Message>(new MessageError(MessageError::ErrorType::NoSchedule)));
-    COMPARE_VECTORS_OF_SMART_PTRS(expectedMsg, callback.messages);
+    COMPARE_VECTORS_OF_SMART_PTRS(expectedMsg, messages);
 
     deviations = center.deviationStats(deviceId);
     ASSERT_EQUAL(0u, deviations.size());

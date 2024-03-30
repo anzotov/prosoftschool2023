@@ -7,14 +7,15 @@
 
 void MessageCommand::serialize(std::ostream& os) const
 {
+    os << signature();
     toBigEndian(os, command());
 }
 
-std::optional<MessageCommand> MessageCommand::deserialize(std::istream& is)
+std::unique_ptr<Message> MessageCommand::deserialize(std::istream& is)
 {
     int command;
     command = fromBigEndian<int8_t>(is);
     if (is.fail())
         return {};
-    return MessageCommand(command);
+    return std::unique_ptr<Message>(new MessageCommand(command));
 }

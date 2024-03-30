@@ -4,7 +4,7 @@
 #include "message.h"
 
 #include <cstdint>
-#include <optional>
+#include <memory>
 
 /*!
  * \brief Класс сообщения с командой для корректировки физического параметра
@@ -20,6 +20,11 @@ public:
         m_command(command) {}
 
     /*!
+     * \brief Обозначение типа сообщения для целей сериализации
+     */
+    static constexpr char signature() { return 'c'; }
+
+    /*!
      * \brief Величина для коррекции физического параметра
      */
     int8_t command() const { return m_command; }
@@ -27,11 +32,11 @@ public:
     /*!
      * \brief Сериализовать сообщение в поток \a os
      */
-    virtual void serialize(std::ostream& os) const override;
+    virtual void serialize(std::ostream& os) const override final;
     /*!
      * \brief Десериализовать сообщение из потока \a is
      */
-    static std::optional<MessageCommand> deserialize(std::istream& is);
+    static std::unique_ptr<Message> deserialize(std::istream& is);
 
     /*!
     * \brief Вывод сообщения в виде строки для отладки
@@ -42,7 +47,7 @@ public:
         return o && command() == o->command();
     }
 
-    void print(std::ostream& os) const override
+    void print(std::ostream& os) const override final
     {
         os << "MessageCommand (command=" << command() << ")";
     }

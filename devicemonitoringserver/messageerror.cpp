@@ -4,6 +4,7 @@
 
 void MessageError::serialize(std::ostream& os) const
 {
+    os << signature();
     switch (errorType())
     {
     case MessageError::ErrorType::NoSchedule:
@@ -18,7 +19,7 @@ void MessageError::serialize(std::ostream& os) const
     }
 }
 
-std::optional<MessageError> MessageError::deserialize(std::istream& is)
+std::unique_ptr<Message> MessageError::deserialize(std::istream& is)
 {
     char ch = is.get();
     if (is.fail())
@@ -26,11 +27,11 @@ std::optional<MessageError> MessageError::deserialize(std::istream& is)
     switch (ch)
     {
     case 's':
-        return MessageError(MessageError::ErrorType::NoSchedule);
+        return std::unique_ptr<Message>(new MessageError(MessageError::ErrorType::NoSchedule));
     case 't':
-        return MessageError(MessageError::ErrorType::NoTimestamp);
+        return std::unique_ptr<Message>(new MessageError(MessageError::ErrorType::NoTimestamp));
     case 'o':
-        return MessageError(MessageError::ErrorType::Obsolete);
+        return std::unique_ptr<Message>(new MessageError(MessageError::ErrorType::Obsolete));
     }
     return {};
 }

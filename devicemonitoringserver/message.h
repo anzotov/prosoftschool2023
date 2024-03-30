@@ -1,6 +1,8 @@
 #ifndef MESSAGE_H
 #define MESSAGE_H
 
+#include <functional>
+#include <memory>
 #include <ostream>
 
 /*!
@@ -10,6 +12,11 @@ class Message
 {
 public:
     virtual ~Message() = default;
+
+    /*!
+     * \brief Десериализовать сообщение из входного потока \a is
+     */
+    static std::unique_ptr<Message> deserialize(std::istream& is);
 
     /*!
      * \brief Сериализовать сообщение в поток \a os

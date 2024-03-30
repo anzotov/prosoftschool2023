@@ -61,12 +61,12 @@ void DeviceMonitoringServer::sendMessage(uint64_t deviceId, const std::string& m
 
 void DeviceMonitoringServer::onMessageReceived(uint64_t deviceId, const std::string& message)
 {
-    m_serializer.deserialize(m_encoder.decode(message), [this, deviceId](const Message& message) {
-        const MessageMeterage* messageMeterage = dynamic_cast<const MessageMeterage*>(&message);
+    if (auto msg = MessageSerializer::deserialize(m_encoder.decode(message)))
+    {
+        const MessageMeterage* messageMeterage = dynamic_cast<const MessageMeterage*>(msg.get());
         if (messageMeterage)
-            m_commandcenter.processMeterage(deviceId, *messageMeterage,
-                                            [this](uint64_t deviceId, const Message& message) { sendMessage(deviceId, message); });
-    });
+            sendMessage(deviceId, *m_commandcenter.processMeterage(deviceId, *messageMeterage));
+    }
 }
 
 void DeviceMonitoringServer::onDisconnected(uint64_t /*clientId*/)
@@ -123,5 +123,5 @@ void DeviceMonitoringServer::addDisconnectedHandler(AbstractConnection* conn)
 
 void DeviceMonitoringServer::sendMessage(uint64_t deviceId, const Message& message)
 {
-    sendMessage(deviceId, m_encoder.encode(m_serializer.serialize(message)));
+    sendMessage(deviceId, m_encoder.encode(MessageSerializer::serialize(message)));
 }

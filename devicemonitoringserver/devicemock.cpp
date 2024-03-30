@@ -78,26 +78,11 @@ void DeviceMock::sendMessage(const std::string& message) const
 
 void DeviceMock::onMessageReceived(const std::string& message)
 {
-    if (!m_serializer.deserialize(m_encoder.decode(message),
-                                  [this](const Message& message) {
-        do
-        {
-            const MessageCommand* messageCommand = dynamic_cast<const MessageCommand*>(&message);
-            if (messageCommand)
-            {
-                m_messages.push_back(std::unique_ptr<Message>(new MessageCommand(*messageCommand)));
-                break;
-            }
-            const MessageError* messageError = dynamic_cast<const MessageError*>(&message);
-            if (messageError)
-            {
-                m_messages.push_back(std::unique_ptr<Message>(new MessageError(*messageError)));
-                break;
-            }
-            throw std::logic_error("Wrong message type!");
-        } while (false);
-    }))
+    if (auto msg = MessageSerializer::deserialize(m_encoder.decode(message)))
+        m_messages.push_back(std::move(msg));
+    else
         throw std::runtime_error("Message deserialization error!");
+
     sendNextMeterage(); // Отправляем следующее измерение
 }
 
@@ -135,7 +120,7 @@ void DeviceMock::sendNextMeterage()
     if (m_timeStamp >= m_meterages.size())
         return;
     const auto meterage = m_meterages.at(m_timeStamp);
-    auto string = m_serializer.serialize(MessageMeterage(m_timeStamp, meterage));
+    auto string = MessageSerializer::serialize(MessageMeterage(m_timeStamp, meterage));
     if (!string.empty())
     {
         sendMessage(m_encoder.encode(string));

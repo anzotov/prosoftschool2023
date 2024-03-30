@@ -1,7 +1,7 @@
 #ifndef MESSAGESERIALIZER_H
 #define MESSAGESERIALIZER_H
 
-#include <functional>
+#include <memory>
 #include <string>
 
 class Message;
@@ -12,17 +12,15 @@ class Message;
 class MessageSerializer
 {
 public:
+    MessageSerializer() = delete;
     /*!
      * \brief Сериализовать сообщение \a message
      */
-    std::string serialize(const Message& message) const;
+    static std::string serialize(const Message& message);
     /*!
-     * \brief Десериализовать сообщение
-     * \param string - строка с сообщением
-     * \param callback - коллбэк для обработки десериализованного сообщения
-     * \return false в случае ошибки
+     * \brief Десериализовать сообщение из строки \a string
      */
-    bool deserialize(const std::string& string, std::function<void(const Message&)> callback) const;
+    static std::unique_ptr<Message> deserialize(const std::string& string);
 };
 
 #endif // MESSAGESERIALIZER_H

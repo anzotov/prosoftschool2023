@@ -4,8 +4,8 @@
 #include "deviceworkschedule.h"
 
 #include <cstdint>
-#include <functional>
 #include <map>
+#include <memory>
 #include <vector>
 
 class DeviceMonitoringServer;
@@ -36,9 +36,9 @@ public:
      * \brief Обработать сообщение с измерением
      * \param deviceId - идентификатор устройства
      * \param meterage - сообшение с измерением
-     * \param callback - коллбэк для отправки сообщения с результатом обработки
+     * \return сообшение с ответом
      */
-    void processMeterage(uint64_t deviceId, MessageMeterage meterage, std::function<void(uint64_t, const Message&)> callback);
+    std::unique_ptr<Message> processMeterage(uint64_t deviceId, MessageMeterage meterage);
     /*!
      * \brief Статистика СКО физических параметров от плана для устройства с идентификатором \a deviceId
      */

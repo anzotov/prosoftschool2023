@@ -4,7 +4,7 @@
 #include "message.h"
 
 #include <istream>
-#include <optional>
+#include <memory>
 
 /*!
  * \brief Класс сообщения об ошибке
@@ -29,25 +29,30 @@ public:
         m_errorType(errorType) {}
 
     /*!
+     * \brief Обозначение типа сообщения для целей сериализации
+     */
+    static constexpr char signature() { return 'e'; }
+
+    /*!
      * \brief Тип ошибки
      */
     ErrorType errorType() const { return m_errorType; }
     /*!
      * \brief Сериализовать сообщение в поток \a os
      */
-    virtual void serialize(std::ostream& os) const override;
+    virtual void serialize(std::ostream& os) const override final;
     /*!
      * \brief Десериализовать сообщение из потока \a is
      */
-    static std::optional<MessageError> deserialize(std::istream& is);
+    static std::unique_ptr<Message> deserialize(std::istream& is);
 
-    bool operator==(const Message& other) const override
+    bool operator==(const Message& other) const override final
     {
         const MessageError* o = dynamic_cast<const MessageError*>(&other);
         return o && errorType() == o->errorType();
     }
 
-    void print(std::ostream& os) const override;
+    void print(std::ostream& os) const override final;
 
 private:
     const ErrorType m_errorType;

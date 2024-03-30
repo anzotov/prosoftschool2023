@@ -18,25 +18,19 @@ void CommandCenter::setSchedule(const DeviceWorkSchedule& schedule)
               [](const Phase& phaseA, const Phase& phaseB) { return phaseA.timeStamp < phaseB.timeStamp; });
 }
 
-void CommandCenter::processMeterage(uint64_t deviceId, MessageMeterage meterage, std::function<void(uint64_t, const Message&)> callback)
+std::unique_ptr<Message> CommandCenter::processMeterage(uint64_t deviceId, MessageMeterage meterage)
 {
     auto currentTimeStamp = meterage.timeStamp();
 
     auto lastTimeStampIt = m_lastTimeStamp.find(deviceId);
     if (lastTimeStampIt != m_lastTimeStamp.end() && lastTimeStampIt->second >= currentTimeStamp)
-    {
-        callback(deviceId, MessageError(MessageError::ErrorType::Obsolete));
-        return;
-    }
+        return std::unique_ptr<Message>(new MessageError(MessageError::ErrorType::Obsolete));
     m_lastTimeStamp[deviceId] = currentTimeStamp;
 
     auto& scheduleInfo = m_scheduleInfo[deviceId];
     auto& statsInfo = m_statsInfo[deviceId];
     if (scheduleInfo.phases.empty())
-    {
-        callback(deviceId, MessageError(MessageError::ErrorType::NoSchedule));
-        return;
-    }
+        return std::unique_ptr<Message>(new MessageError(MessageError::ErrorType::NoSchedule));
 
     while (scheduleInfo.currentPhaseIndex + 1 < scheduleInfo.phases.size()
            && scheduleInfo.phases[scheduleInfo.currentPhaseIndex + 1].timeStamp <= currentTimeStamp)
@@ -47,10 +41,7 @@ void CommandCenter::processMeterage(uint64_t deviceId, MessageMeterage meterage,
     auto currentPhase = scheduleInfo.phases[scheduleInfo.currentPhaseIndex];
 
     if (currentPhase.timeStamp > currentTimeStamp)
-    {
-        callback(deviceId, MessageError(MessageError::ErrorType::NoTimestamp));
-        return;
-    }
+        return std::unique_ptr<Message>(new MessageError(MessageError::ErrorType::NoTimestamp));
 
     int command = currentPhase.value - meterage.meterage();
 
@@ -68,7 +59,7 @@ void CommandCenter::processMeterage(uint64_t deviceId, MessageMeterage meterage,
     double deviation = std::sqrt(squareDiffsSum / statsInfo.squareDiffs.size());
     lastDeviationStatIt->deviation = deviation;
 
-    callback(deviceId, MessageCommand(command));
+    return std::unique_ptr<Message>(new MessageCommand(command));
 }
 
 std::vector<DeviationStats> CommandCenter::deviationStats(uint64_t deviceId) const

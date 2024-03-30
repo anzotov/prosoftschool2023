@@ -76,7 +76,6 @@ private:
 private:
     AbstractConnectionServer* m_connectionServer = nullptr;
     CommandCenter m_commandcenter;
-    MessageSerializer m_serializer;
     MessageEncoder m_encoder;
 };
 

@@ -4,7 +4,7 @@
 #include "message.h"
 
 #include <cstdint>
-#include <optional>
+#include <memory>
 
 /*!
  * \brief Класс сообщения с измерением физического параметра
@@ -19,6 +19,12 @@ public:
      */
     MessageMeterage(uint64_t timeStamp, uint8_t meterage) :
         m_timeStamp(timeStamp), m_meterage(meterage) {}
+
+    /*!
+     * \brief Обозначение типа сообщения для целей сериализации
+     */
+    static constexpr char signature() { return 'm'; }
+
     /*!
      * \brief Временная метка измерения
      */
@@ -31,11 +37,11 @@ public:
     /*!
      * \brief Сериализовать сообщение в поток \a os
      */
-    virtual void serialize(std::ostream& os) const override;
+    virtual void serialize(std::ostream& os) const override final;
     /*!
      * \brief Десериализовать сообщение из потока \a is
      */
-    static std::optional<MessageMeterage> deserialize(std::istream& is);
+    static std::unique_ptr<Message> deserialize(std::istream& is);
 
     bool operator==(const Message& other) const
     {
@@ -43,7 +49,7 @@ public:
         return o && timeStamp() == o->timeStamp() && meterage() == o->meterage();
     }
 
-    void print(std::ostream& os) const override
+    void print(std::ostream& os) const override final
     {
         os << "MessageMeterage (timeStamp=" << timeStamp() << ", meterage=" << static_cast<int>(meterage()) << ")";
     }

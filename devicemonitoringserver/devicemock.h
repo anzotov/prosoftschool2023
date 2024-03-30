@@ -85,7 +85,6 @@ private:
     std::vector<uint8_t> m_meterages;
     uint64_t m_timeStamp = 0;
     std::vector<std::unique_ptr<Message>> m_messages;
-    MessageSerializer m_serializer;
     MessageEncoder m_encoder;
 };
 
